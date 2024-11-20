@@ -1,0 +1,7 @@
+﻿Id: DatabaseMerge_39a68e17-7510-4ad9-971e-5695e6db4c75
+Name: Custom Library Importer
+Author: John Doe
+Version: 1.0
+Module: DatabaseMerge.dll
+Type: GameLibrary
+Icon: icon.png
