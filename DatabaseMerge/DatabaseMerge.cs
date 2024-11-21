@@ -41,6 +41,19 @@ namespace DatabaseMerge
             
 
         }
+        
+        private List<Guid> ArrayToGuids(BsonArray array)
+        {
+            //demo value: [{"$guid":"aec1ae80-795f-4c8c-9040-bdfc7cc80ba6"}]
+            var list = new List<Guid>();
+            foreach (BsonValue guid in array)
+            {
+                list.Add(Guid.Parse(guid.AsString));
+                logger.Info(list.Last().ToString());
+            }
+
+            return list;
+        }
 
         public IEnumerable<Game> ImportDatabase(string path) 
         {
@@ -54,27 +67,104 @@ namespace DatabaseMerge
                     logger.Info(name);
                 }
                 var games = db.GetCollection("Game");
-                //print litecollection
-                logger.Info(games.Count().ToString());
-                //print out games
+                //convert collection into list of Game
+                List<Game> gamesObjects = new List<Game>();
                 foreach (var game in games.FindAll())
                 {
-                    logger.Info(game["Name"].ToString());
-                    //convert to Game object
+                    //logger.Info(game["Name"].AsString);
+                    gamesObjects.Add(GameFromBson(game));
+                    //logger.Info(gamesObjects.Last().Name);
                     
-                    
-                }
-                var gameslist = db.GetCollection<Game>("Game");
-                logger.Info(gameslist.Count().ToString());
-                IEnumerable<Game> gameslist2 = gameslist.FindAll();
-                foreach (var game in gameslist2)
-                {
-                    logger.Info(game.Name);
                 }
                 
-                return new List<Game>();
+                //reference playnite library
+                var playniteDb = PlayniteApi.Database.Games;
+                //check if each imported game already exists
+                foreach (var game in gamesObjects)
+                {
+                    if(playniteDb.ContainsItem(game.Id))
+                    {
+                        logger.Info("Game not found in Playnite library: " + game.Name);
+                        playniteDb.Add(game);
+                    }
+                    else
+                    {
+                        logger.Info("Game found in Playnite library" + game.Name);
+                        //compare values and update playnite games if necessary
+                        foreach (var key in game.GetDifferences(playniteDb.Get(game.Id)))
+                        {
+                            logger.Info(key.ToString());
+                            //playniteDb.Update(game);
+                            
+                        }
+                        
+                    }
+                }
+
+                return gamesObjects;
             }
 
+        }
+        
+        public Game GameFromBson(BsonDocument bson)
+        {
+            Game game = new Game();
+            var thing = bson;
+            //check if each parameter exists
+            if(thing.TryGetValue("Name", out BsonValue name))
+            {
+                game.Name = thing["Name"].AsString;
+                logger.Info(game.Name);
+            }
+            if(thing.TryGetValue("Description", out BsonValue description))
+            {
+                game.Description = thing["Description"].AsString;
+                logger.Info(game.Description);
+            }
+            if(thing.TryGetValue("GenreIds", out BsonValue genres))
+            {
+                game.GenreIds = new List<Guid>();
+                game.GenreIds = ArrayToGuids(thing["GenreIds"].AsArray);   
+            }
+            if(thing.TryGetValue("Tags", out BsonValue tags))
+            {
+                game.TagIds = new List<Guid>();
+                game.TagIds = ArrayToGuids(thing["Tags"].AsArray);
+            }
+            if(thing.TryGetValue("PlatformIds", out BsonValue platforms))
+            {
+                game.PlatformIds = new List<Guid>();
+                game.PlatformIds = ArrayToGuids(thing["PlatformIds"].AsArray);
+            }
+            if(thing.TryGetValue("ReleaseDate", out BsonValue releaseDate))
+            {
+                game.ReleaseDate = ReleaseDate.Deserialize(thing["ReleaseDate"].AsString);
+                logger.Info(game.ReleaseDate.ToString());
+            }
+                //bson: [PublisherIds, [{"$guid":"aec1ae80-795f-4c8c-9040-bdfc7cc80ba6"}]]
+            if (thing.TryGetValue("DeveloperIds", out BsonValue developerIds))
+            {
+                game.DeveloperIds = new List<Guid>();
+                game.DeveloperIds = ArrayToGuids(thing["DeveloperIds"].AsArray);
+            }
+            if(thing.TryGetValue("PublisherIds", out BsonValue publisherIds))
+            {
+                game.PublisherIds = new List<Guid>();
+                game.PublisherIds = ArrayToGuids(thing["PublisherIds"].AsArray);
+            }
+            if(thing.TryGetValue("CoverImage", out BsonValue coverImage))
+            {
+                game.CoverImage = thing["CoverImage"].AsString;
+            }
+            if(thing.TryGetValue("Icon", out BsonValue icon))
+            {
+                game.Icon = thing["Icon"].AsString;
+            }
+            if(thing.TryGetValue("BackgroundImage", out BsonValue backgroundImage)) {
+                game.BackgroundImage = thing["BackgroundImage"].AsString;
+            }
+            
+            return game;
         }
         
         //print out games from current database and imported database
